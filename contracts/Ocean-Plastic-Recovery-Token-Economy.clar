@@ -264,4 +264,63 @@
   )
 )
 
+(define-constant ERR_NO_STAKE (err u108))
+
+(define-data-var staking-reward-rate uint u1)
+
+(define-map stakes
+  { user: principal }
+  {
+    amount: uint,
+    start-time: uint
+  }
+)
+
+(define-read-only (get-stake (user principal))
+  (map-get? stakes { user: user })
+)
+
+(define-public (stake-tokens (amount uint))
+  (let
+    (
+      (current-balance (ft-get-balance ocean-plastic-token tx-sender))
+    )
+    (asserts! (>= current-balance amount) ERR_INSUFFICIENT_BALANCE)
+    (asserts! (> amount u0) ERR_INVALID_AMOUNT)
+    (try! (ft-transfer? ocean-plastic-token amount tx-sender (as-contract tx-sender)))
+    (map-set stakes
+      { user: tx-sender }
+      {
+        amount: amount,
+        start-time: stacks-block-height
+      }
+    )
+    (ok true)
+  )
+)
+
+(define-public (unstake-tokens)
+  (let
+    (
+      (stake-data (unwrap! (map-get? stakes { user: tx-sender }) ERR_NO_STAKE))
+      (amount (get amount stake-data))
+      (start-time (get start-time stake-data))
+      (duration (- stacks-block-height start-time))
+      (reward (* amount duration (var-get staking-reward-rate)))
+    )
+    (try! (as-contract (ft-transfer? ocean-plastic-token (+ amount reward) tx-sender tx-sender)))
+    (map-delete stakes { user: tx-sender })
+    (ok (+ amount reward))
+  )
+)
+
+(define-public (set-staking-reward-rate (new-rate uint))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+    (asserts! (> new-rate u0) ERR_INVALID_AMOUNT)
+    (var-set staking-reward-rate new-rate)
+    (ok true)
+  )
+)
+
 (ft-mint? ocean-plastic-token u1000000 CONTRACT_OWNER)
