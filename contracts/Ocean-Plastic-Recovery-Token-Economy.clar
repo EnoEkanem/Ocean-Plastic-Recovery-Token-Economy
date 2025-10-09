@@ -8,6 +8,8 @@
 (define-constant ERR_INVALID_RECYCLER (err u106))
 (define-constant ERR_COLLECTION_NOT_VERIFIED (err u107))
 
+(define-constant ERR_CONTRACT_PAUSED (err u109))
+
 (define-fungible-token ocean-plastic-token)
 
 (define-map collections
@@ -44,6 +46,8 @@
 (define-data-var collection-counter uint u0)
 (define-data-var token-reward-rate uint u10)
 (define-data-var verification-threshold uint u5)
+(define-data-var contract-paused bool false)
+(define-data-var donation-pool uint u0)
 
 (define-read-only (get-collection (collection-id uint))
   (map-get? collections { collection-id: collection-id })
@@ -75,6 +79,7 @@
 
 (define-public (register-recycler (name (string-ascii 50)))
   (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (ok (map-set recyclers
       { recycler: tx-sender }
@@ -92,6 +97,7 @@
     (
       (collection-id (+ (var-get collection-counter) u1))
     )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (> plastic-amount u0) ERR_INVALID_AMOUNT)
     (asserts! (and (>= latitude -90000000) (<= latitude 90000000)) ERR_INVALID_LOCATION)
     (asserts! (and (>= longitude -180000000) (<= longitude 180000000)) ERR_INVALID_LOCATION)
@@ -119,6 +125,7 @@
     (
       (collection-data (unwrap! (get-collection collection-id) ERR_NOT_FOUND))
     )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (asserts! (is-eq (get verified collection-data) false) ERR_ALREADY_VERIFIED)
     
@@ -159,6 +166,7 @@
       (collection-data (unwrap! (get-collection collection-id) ERR_NOT_FOUND))
       (recycler-data (unwrap! (get-recycler recycler) ERR_INVALID_RECYCLER))
     )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (asserts! (get verified collection-data) ERR_COLLECTION_NOT_VERIFIED)
     (asserts! (get verified recycler-data) ERR_INVALID_RECYCLER)
@@ -184,6 +192,7 @@
     (
       (user-balance (ft-get-balance ocean-plastic-token tx-sender))
     )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (>= user-balance token-amount) ERR_INSUFFICIENT_BALANCE)
     (asserts! (> token-amount u0) ERR_INVALID_AMOUNT)
     
@@ -194,6 +203,7 @@
 
 (define-public (transfer-tokens (amount uint) (recipient principal))
   (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (> amount u0) ERR_INVALID_AMOUNT)
     (ft-transfer? ocean-plastic-token amount tx-sender recipient)
   )
@@ -201,6 +211,7 @@
 
 (define-public (set-token-reward-rate (new-rate uint))
   (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (asserts! (> new-rate u0) ERR_INVALID_AMOUNT)
     (var-set token-reward-rate new-rate)
@@ -210,6 +221,7 @@
 
 (define-public (set-verification-threshold (new-threshold uint))
   (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (var-set verification-threshold new-threshold)
     (ok true)
@@ -250,8 +262,13 @@
   )
 )
 
+(define-read-only (get-donation-pool)
+  (var-get donation-pool)
+)
+
 (define-public (bulk-verify-collections (collection-ids (list 10 uint)))
   (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (ok (map verify-single-collection collection-ids))
   )
@@ -285,6 +302,7 @@
     (
       (current-balance (ft-get-balance ocean-plastic-token tx-sender))
     )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (>= current-balance amount) ERR_INSUFFICIENT_BALANCE)
     (asserts! (> amount u0) ERR_INVALID_AMOUNT)
     (try! (ft-transfer? ocean-plastic-token amount tx-sender (as-contract tx-sender)))
@@ -308,6 +326,7 @@
       (duration (- stacks-block-height start-time))
       (reward (* amount duration (var-get staking-reward-rate)))
     )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (try! (as-contract (ft-transfer? ocean-plastic-token (+ amount reward) tx-sender tx-sender)))
     (map-delete stakes { user: tx-sender })
     (ok (+ amount reward))
@@ -316,9 +335,51 @@
 
 (define-public (set-staking-reward-rate (new-rate uint))
   (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (asserts! (> new-rate u0) ERR_INVALID_AMOUNT)
     (var-set staking-reward-rate new-rate)
+    (ok true)
+  )
+)
+
+(define-public (pause-contract)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+    (var-set contract-paused true)
+    (ok true)
+  )
+)
+
+(define-public (unpause-contract)
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+    (var-set contract-paused false)
+    (ok true)
+  )
+)
+
+(define-public (donate-tokens (amount uint))
+  (let
+    (
+      (current-balance (ft-get-balance ocean-plastic-token tx-sender))
+    )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
+    (asserts! (>= current-balance amount) ERR_INSUFFICIENT_BALANCE)
+    (asserts! (> amount u0) ERR_INVALID_AMOUNT)
+    (try! (ft-transfer? ocean-plastic-token amount tx-sender (as-contract tx-sender)))
+    (var-set donation-pool (+ (var-get donation-pool) amount))
+    (ok true)
+  )
+)
+
+(define-public (withdraw-donations (amount uint) (recipient principal))
+  (begin
+    (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+    (asserts! (>= (var-get donation-pool) amount) ERR_INSUFFICIENT_BALANCE)
+    (asserts! (> amount u0) ERR_INVALID_AMOUNT)
+    (try! (as-contract (ft-transfer? ocean-plastic-token amount tx-sender recipient)))
+    (var-set donation-pool (- (var-get donation-pool) amount))
     (ok true)
   )
 )

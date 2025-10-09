@@ -1,4 +1,4 @@
-## 🎯 Overview
+##  Overview
 
 A blockchain-based token economy that incentivizes ocean plastic cleanup through verified collection rewards and eco-credit exchanges.
 
@@ -9,6 +9,7 @@ A blockchain-based token economy that incentivizes ocean plastic cleanup through
 - ♻️ **Recycler Partnerships**: Connect with verified recycling partners
 - 💚 **Eco-Credit Exchange**: Convert tokens to environmental credits
 - 📊 **Progress Tracking**: Monitor individual and community impact
+- 🚨 **Emergency Pause**: Contract owner can halt all operations during emergencies
 
 ## 🛠️ Quick Start
 
@@ -69,7 +70,17 @@ npm test
 - Burn tokens in exchange for eco-credits
 - Permanent token removal from circulation
 
-### 📊 Query Functions
+### 🚨 Emergency Functions
+
+**`pause-contract`**
+- Halt all contract operations immediately
+- Admin function for emergency response
+
+**`unpause-contract`**
+- Resume normal contract operations
+- Admin function to lift emergency pause
+
+### � Query Functions
 
 **`get-collection`**
 - View collection details by ID
@@ -124,6 +135,7 @@ The contract maintains comprehensive statistics:
 - GPS coordinate validation
 - Secure token transfer mechanisms
 - Verified recycler network
+- Emergency pause mechanism for rapid incident response
 
 ## 🤝 Contributing
 
