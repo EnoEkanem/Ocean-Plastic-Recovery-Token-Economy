@@ -49,6 +49,13 @@
 (define-data-var contract-paused bool false)
 (define-data-var donation-pool uint u0)
 
+(define-map referrals
+  { user: principal }
+  { referrer: (optional principal) }
+)
+
+(define-data-var referral-bonus-rate uint u10)
+
 (define-read-only (get-collection (collection-id uint))
   (map-get? collections { collection-id: collection-id })
 )
@@ -145,7 +152,7 @@
         ))
       )
       (try! (ft-mint? ocean-plastic-token tokens-to-mint collector))
-      
+
       (map-set user-stats
         { user: collector }
         {
@@ -154,8 +161,18 @@
           collections-count: (+ (get collections-count current-stats) u1)
         }
       )
-      
-      (ok tokens-to-mint)
+
+      (match (get referrer (map-get? referrals { user: collector }))
+        referrer-principal
+        (let
+          (
+            (bonus (* tokens-to-mint (var-get referral-bonus-rate)))
+          )
+          (try! (ft-mint? ocean-plastic-token bonus (unwrap-panic referrer-principal)))
+          (ok tokens-to-mint)
+        )
+        (ok tokens-to-mint)
+      )
     )
   )
 )
@@ -264,6 +281,14 @@
 
 (define-read-only (get-donation-pool)
   (var-get donation-pool)
+)
+
+(define-read-only (get-referral (user principal))
+  (map-get? referrals { user: user })
+)
+
+(define-read-only (get-referral-bonus-rate)
+  (var-get referral-bonus-rate)
 )
 
 (define-public (bulk-verify-collections (collection-ids (list 10 uint)))
@@ -380,6 +405,24 @@
     (asserts! (> amount u0) ERR_INVALID_AMOUNT)
     (try! (as-contract (ft-transfer? ocean-plastic-token amount tx-sender recipient)))
     (var-set donation-pool (- (var-get donation-pool) amount))
+    (ok true)
+  )
+)
+
+(define-public (set-referral (referrer principal))
+  (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
+    (asserts! (not (is-eq tx-sender referrer)) ERR_UNAUTHORIZED)
+    (asserts! (is-none (get referrer (map-get? referrals { user: tx-sender }))) ERR_UNAUTHORIZED)
+    (ok (map-set referrals { user: tx-sender } { referrer: (some referrer) }))
+  )
+)
+
+(define-public (set-referral-bonus-rate (new-rate uint))
+  (begin
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
+    (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
+    (var-set referral-bonus-rate new-rate)
     (ok true)
   )
 )

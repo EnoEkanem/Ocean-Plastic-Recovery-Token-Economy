@@ -10,6 +10,7 @@ A blockchain-based token economy that incentivizes ocean plastic cleanup through
 - 💚 **Eco-Credit Exchange**: Convert tokens to environmental credits
 - 📊 **Progress Tracking**: Monitor individual and community impact
 - 🚨 **Emergency Pause**: Contract owner can halt all operations during emergencies
+- 👥 **Referral Program**: Earn bonus tokens by referring new collectors
 
 ## 🛠️ Quick Start
 
@@ -70,6 +71,16 @@ npm test
 - Burn tokens in exchange for eco-credits
 - Permanent token removal from circulation
 
+### 👥 Referral Functions
+
+**`set-referral`**
+- Set a referrer to earn bonus tokens on their collections
+- One-time setup per user
+
+**`set-referral-bonus-rate`**
+- Adjust referral bonus percentage (admin only)
+- Determines bonus tokens earned by referrers
+
 ### 🚨 Emergency Functions
 
 **`pause-contract`**
@@ -93,6 +104,12 @@ npm test
 
 **`get-recycler-stats`**
 - View recycler processing statistics
+
+**`get-referral`**
+- Check user's current referrer
+
+**`get-referral-bonus-rate`**
+- View current referral bonus percentage
 
 ## 📍 GPS Coordinate Format
 
@@ -121,6 +138,11 @@ Coordinates use integer format with 6 decimal precision:
 (contract-call? .Ocean-Plastic-Recovery-Token-Economy exchange-tokens-for-eco-credits u100)
 ```
 
+### Set Referral
+```clarity
+(contract-call? .Ocean-Plastic-Recovery-Token-Economy set-referral 'SP1234...)
+```
+
 ## 🌍 Impact Tracking
 
 The contract maintains comprehensive statistics:
@@ -128,6 +150,7 @@ The contract maintains comprehensive statistics:
 - Total plastic recovered from oceans
 - Recycler processing volumes
 - Token circulation and eco-credit exchanges
+- Referral network growth and bonus distributions
 
 ## 🔒 Security Features
 
