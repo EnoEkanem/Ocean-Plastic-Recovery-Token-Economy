@@ -9,6 +9,10 @@
 (define-constant ERR_COLLECTION_NOT_VERIFIED (err u107))
 
 (define-constant ERR_CONTRACT_PAUSED (err u109))
+(define-constant ERR_INVALID_PROPOSAL (err u110))
+(define-constant ERR_ALREADY_VOTED (err u111))
+(define-constant ERR_VOTING_PERIOD_ENDED (err u112))
+(define-constant ERR_INSUFFICIENT_VOTING_POWER (err u113))
 
 (define-fungible-token ocean-plastic-token)
 
@@ -423,6 +427,104 @@
     (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
     (asserts! (is-eq tx-sender CONTRACT_OWNER) ERR_UNAUTHORIZED)
     (var-set referral-bonus-rate new-rate)
+    (ok true)
+  )
+)
+(define-map proposals
+  { proposal-id: uint }
+  {
+    proposer: principal,
+    description: (string-ascii 256),
+    proposal-type: uint,
+    value: uint,
+    votes-for: uint,
+    votes-against: uint,
+    end-block: uint,
+    executed: bool
+  }
+)
+(define-map votes
+  { proposal-id: uint, voter: principal }
+  { vote: bool, voting-power: uint }
+)
+(define-data-var proposal-counter uint u0)
+(define-data-var voting-period uint u1440)
+(define-data-var quorum-threshold uint u100000)
+(define-read-only (get-proposal (proposal-id uint))
+  (map-get? proposals { proposal-id: proposal-id })
+)
+(define-public (create-proposal (description (string-ascii 256)) (proposal-type uint) (value uint))
+  (let
+    (
+      (proposal-id (+ (var-get proposal-counter) u1))
+      (voting-power (ft-get-balance ocean-plastic-token tx-sender))
+    )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
+    (asserts! (>= voting-power (var-get quorum-threshold)) ERR_INSUFFICIENT_VOTING_POWER)
+    (map-set proposals
+      { proposal-id: proposal-id }
+      {
+        proposer: tx-sender,
+        description: description,
+        proposal-type: proposal-type,
+        value: value,
+        votes-for: u0,
+        votes-against: u0,
+        end-block: (+ stacks-block-height (var-get voting-period)),
+        executed: false
+      }
+    )
+    (var-set proposal-counter proposal-id)
+    (ok proposal-id)
+  )
+)
+(define-public (vote-on-proposal (proposal-id uint) (vote bool))
+  (let
+    (
+      (proposal-data (unwrap! (get-proposal proposal-id) ERR_INVALID_PROPOSAL))
+      (voting-power (ft-get-balance ocean-plastic-token tx-sender))
+    )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
+    (asserts! (< stacks-block-height (get end-block proposal-data)) ERR_VOTING_PERIOD_ENDED)
+    (asserts! (is-none (map-get? votes { proposal-id: proposal-id, voter: tx-sender })) ERR_ALREADY_VOTED)
+    (asserts! (> voting-power u0) ERR_INSUFFICIENT_VOTING_POWER)
+    (map-set votes
+      { proposal-id: proposal-id, voter: tx-sender }
+      { vote: vote, voting-power: voting-power }
+    )
+    (if vote
+      (map-set proposals
+        { proposal-id: proposal-id }
+        (merge proposal-data { votes-for: (+ (get votes-for proposal-data) voting-power) })
+      )
+      (map-set proposals
+        { proposal-id: proposal-id }
+        (merge proposal-data { votes-against: (+ (get votes-against proposal-data) voting-power) })
+      )
+    )
+    (ok true)
+  )
+)
+(define-public (execute-proposal (proposal-id uint))
+  (let
+    (
+      (proposal-data (unwrap! (get-proposal proposal-id) ERR_INVALID_PROPOSAL))
+    )
+    (asserts! (not (var-get contract-paused)) ERR_CONTRACT_PAUSED)
+    (asserts! (>= stacks-block-height (get end-block proposal-data)) ERR_VOTING_PERIOD_ENDED)
+    (asserts! (is-eq (get executed proposal-data) false) ERR_INVALID_PROPOSAL)
+    (asserts! (> (get votes-for proposal-data) (get votes-against proposal-data)) ERR_INVALID_PROPOSAL)
+    (if (is-eq (get proposal-type proposal-data) u1)
+      (try! (set-token-reward-rate (get value proposal-data)))
+      (if (is-eq (get proposal-type proposal-data) u2)
+        (try! (set-verification-threshold (get value proposal-data)))
+        (asserts! false ERR_INVALID_PROPOSAL)
+      )
+    )
+    (map-set proposals
+      { proposal-id: proposal-id }
+      (merge proposal-data { executed: true })
+    )
     (ok true)
   )
 )

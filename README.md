@@ -11,6 +11,7 @@ A blockchain-based token economy that incentivizes ocean plastic cleanup through
 - 📊 **Progress Tracking**: Monitor individual and community impact
 - 🚨 **Emergency Pause**: Contract owner can halt all operations during emergencies
 - 👥 **Referral Program**: Earn bonus tokens by referring new collectors
+- 🗳️ **Community Governance**: Token holders can propose and vote on contract changes
 
 ## 🛠️ Quick Start
 
@@ -81,6 +82,23 @@ npm test
 - Adjust referral bonus percentage (admin only)
 - Determines bonus tokens earned by referrers
 
+### 🗳️ Governance Functions
+
+**`create-proposal`**
+- Create a new proposal for contract changes
+- Requires minimum token balance for quorum
+
+**`vote-on-proposal`**
+- Vote on active proposals with token-weighted voting
+- One vote per proposal per user
+
+**`execute-proposal`**
+- Execute approved proposals after voting period
+- Automatically applies changes if majority approval
+
+**`get-proposal`**
+- View proposal details and voting status
+
 ### 🚨 Emergency Functions
 
 **`pause-contract`**
@@ -143,6 +161,25 @@ Coordinates use integer format with 6 decimal precision:
 (contract-call? .Ocean-Plastic-Recovery-Token-Economy set-referral 'SP1234...)
 ```
 
+### Create Proposal
+```clarity
+(contract-call? .Ocean-Plastic-Recovery-Token-Economy create-proposal
+  "Increase token reward rate to 15"
+  u1
+  u15
+)
+```
+
+### Vote on Proposal
+```clarity
+(contract-call? .Ocean-Plastic-Recovery-Token-Economy vote-on-proposal u1 true)
+```
+
+### Execute Proposal
+```clarity
+(contract-call? .Ocean-Plastic-Recovery-Token-Economy execute-proposal u1)
+```
+
 ## 🌍 Impact Tracking
 
 The contract maintains comprehensive statistics:
@@ -151,6 +188,7 @@ The contract maintains comprehensive statistics:
 - Recycler processing volumes
 - Token circulation and eco-credit exchanges
 - Referral network growth and bonus distributions
+- Community-driven governance decisions
 
 ## 🔒 Security Features
 
@@ -159,6 +197,7 @@ The contract maintains comprehensive statistics:
 - Secure token transfer mechanisms
 - Verified recycler network
 - Emergency pause mechanism for rapid incident response
+- Decentralized governance voting system
 
 ## 🤝 Contributing
 
